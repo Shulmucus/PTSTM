@@ -8,6 +8,7 @@ export default async function proxy(request: NextRequest) {
     });
 
     const isAdminPath = request.nextUrl.pathname.startsWith("/admin");
+    const isApiPath = request.nextUrl.pathname.startsWith("/api");
     if (isAdminPath) {
         supabaseResponse.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
         supabaseResponse.headers.set("Pragma", "no-cache");
@@ -70,7 +71,7 @@ export default async function proxy(request: NextRequest) {
 
         // User is an admin
         // If an admin navigates outside /admin, force sign-out so returning requires re-login.
-        if (!isAdminPath) {
+        if (!isAdminPath && !isApiPath) {
             await supabase.auth.signOut();
             return supabaseResponse;
         }
