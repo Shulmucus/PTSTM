@@ -4,6 +4,7 @@ import type { ContentMap, SiteContent } from "@/types";
 import HeroSection from "@/components/home/HeroSection";
 import InfoBoxes from "@/components/home/InfoBoxes";
 import HoverCards from "@/components/home/HoverCards";
+import FloatingHeroCards from "@/components/home/FloatingHeroCards";
 
 export const metadata: Metadata = {
   title: "Home | PT Swadaya Teknik Mandiri",
@@ -62,8 +63,13 @@ export default async function HomePage() {
 
   return (
     <>
-      <HeroSection content={content} />
-      <InfoBoxes content={content} />
+      <section className="relative w-full bg-secondary overflow-hidden">
+        <FloatingHeroCards content={content} />
+        <div className="relative z-10">
+          <HeroSection content={content} />
+          <InfoBoxes content={content} />
+        </div>
+      </section>
       <HoverCards content={content} />
     </>
   );

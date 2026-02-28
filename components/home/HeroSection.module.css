@@ -1,0 +1,33 @@
+.floatingCard {
+  position: absolute;
+  will-change: top, opacity;
+  animation: heroFloatUp var(--hero-float-duration) linear infinite;
+  animation-delay: var(--hero-float-delay, 0s);
+  transform: translateY(-100%) rotate(var(--hero-card-rot, 0deg));
+}
+
+@keyframes heroFloatUp {
+  from {
+    top: 100%;
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  95% {
+    opacity: 1;
+  }
+  to {
+    top: -80%;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floatingCard {
+    animation: none;
+    top: 0;
+    transform: translateY(0) rotate(var(--hero-card-rot, 0deg));
+    opacity: 1;
+  }
+}
