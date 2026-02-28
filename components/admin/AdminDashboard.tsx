@@ -6,7 +6,7 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase";
 import AdminPasswordReset from "@/components/admin/AdminPasswordReset";
 import AdminUserManagement from "@/components/admin/AdminUserManagement";
-import type { ContentMap, ContactInfoEntry, GalleryItem, SiteContentKey, ServiceCardPayload } from "@/types";
+import type { ContentMap, ContactInfoEntry, GalleryItem, HeroBackgroundImage, SiteContentKey, ServiceCardPayload } from "@/types";
 
 /* ─── Content field definitions for the admin editor ─── */
 const CONTENT_SECTIONS = [
@@ -52,13 +52,19 @@ export default function AdminDashboard() {
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"content" | "contact" | "services" | "gallery" | "logo" | "settings">("content");
+  const [activeTab, setActiveTab] = useState<"content" | "hero" | "contact" | "services" | "gallery" | "logo" | "theme" | "settings">("content");
 
   const [contactInfo, setContactInfo] = useState<ContactInfoEntry[]>([]);
   const [contactLoading, setContactLoading] = useState(false);
   const [newContactType, setNewContactType] = useState<ContactInfoEntry["type"]>("phone");
   const [newContactValue, setNewContactValue] = useState("");
   const [newContactLabel, setNewContactLabel] = useState("");
+
+  const [heroBackgroundImages, setHeroBackgroundImages] = useState<HeroBackgroundImage[]>([]);
+  const [heroBgLoading, setHeroBgLoading] = useState(false);
+  const [newHeroBgFile, setNewHeroBgFile] = useState<File | null>(null);
+  const [newHeroBgRotation, setNewHeroBgRotation] = useState("0");
+  const [uploadingHeroBg, setUploadingHeroBg] = useState(false);
 
   // Dynamic Service Cards State
   const [services, setServices] = useState<ServiceCardPayload[]>([]);
@@ -109,6 +115,23 @@ export default function AdminDashboard() {
       setContactInfo([]);
     } finally {
       setContactLoading(false);
+    }
+  }, []);
+
+  const fetchHeroBackgroundImages = useCallback(async () => {
+    setHeroBgLoading(true);
+    try {
+      const res = await fetch("/api/admin/hero-background-images");
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        setHeroBackgroundImages([]);
+        return;
+      }
+      setHeroBackgroundImages((json.data ?? []) as HeroBackgroundImage[]);
+    } catch {
+      setHeroBackgroundImages([]);
+    } finally {
+      setHeroBgLoading(false);
     }
   }, []);
 
@@ -200,8 +223,103 @@ export default function AdminDashboard() {
       fetchContent();
       fetchGallery();
       fetchContactInfo();
+      fetchHeroBackgroundImages();
     }
-  }, [user, loading, fetchContent, fetchGallery, fetchContactInfo]);
+  }, [user, loading, fetchContent, fetchGallery, fetchContactInfo, fetchHeroBackgroundImages]);
+
+  const handleAddHeroBackgroundImage = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!newHeroBgFile) return;
+
+    setUploadingHeroBg(true);
+    setSaveMessage(null);
+
+    try {
+      const fileExt = newHeroBgFile.name.split(".").pop();
+      const fileName = `hero-bg/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("assets")
+        .upload(fileName, newHeroBgFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("assets")
+        .getPublicUrl(fileName);
+
+      const rotation = Number(newHeroBgRotation || "0");
+
+      const res = await fetch("/api/admin/hero-background-images", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_url: urlData.publicUrl, rotation_deg: rotation }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        setSaveMessage(json.error || "Failed to add hero background image");
+        setTimeout(() => setSaveMessage(null), 3000);
+        return;
+      }
+
+      setNewHeroBgFile(null);
+      setNewHeroBgRotation("0");
+      await fetchHeroBackgroundImages();
+      setSaveMessage("Hero background image added!");
+    } catch {
+      setSaveMessage("Failed to add hero background image");
+    } finally {
+      setUploadingHeroBg(false);
+      setTimeout(() => setSaveMessage(null), 3000);
+    }
+  };
+
+  const handleDeleteHeroBackgroundImage = async (id: string) => {
+    if (!confirm("Delete this hero background image?")) return;
+
+    setHeroBgLoading(true);
+    try {
+      const res = await fetch("/api/admin/hero-background-images", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        setSaveMessage(json.error || "Failed to delete hero background image");
+        setTimeout(() => setSaveMessage(null), 3000);
+        return;
+      }
+      await fetchHeroBackgroundImages();
+      setSaveMessage("Hero background image deleted.");
+    } catch {
+      setSaveMessage("Failed to delete hero background image");
+    } finally {
+      setHeroBgLoading(false);
+      setTimeout(() => setSaveMessage(null), 3000);
+    }
+  };
+
+  const handleUpdateHeroBackgroundImage = async (id: string, update: { rotation_deg?: number; sort_order?: number }) => {
+    try {
+      const res = await fetch("/api/admin/hero-background-images", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...update }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        setSaveMessage(json.error || "Failed to update hero background image");
+        setTimeout(() => setSaveMessage(null), 3000);
+        return;
+      }
+      await fetchHeroBackgroundImages();
+    } catch {
+      setSaveMessage("Failed to update hero background image");
+      setTimeout(() => setSaveMessage(null), 3000);
+    }
+  };
 
   const handleAddContactInfo = async () => {
     if (!newContactValue.trim()) return;
@@ -544,7 +662,7 @@ export default function AdminDashboard() {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Tab Navigation */}
         <div className="flex gap-2 mb-8 border-b border-border">
-          {(["content", "contact", "services", "gallery", "logo", "settings"] as const).map((tab) => (
+          {(["content", "hero", "contact", "services", "gallery", "logo", "theme", "settings"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -555,14 +673,18 @@ export default function AdminDashboard() {
             >
               {tab === "content"
                 ? "Site Content"
+                : tab === "hero"
+                  ? "Hero Background"
                 : tab === "contact"
                   ? "Contact Info"
-                  : tab === "services"
+                : tab === "services"
                     ? "Services"
                     : tab === "gallery"
                       ? "Gallery"
                       : tab === "logo"
                         ? "Logo"
+                        : tab === "theme"
+                          ? "Theme"
                         : "Settings"}
             </button>
           ))}
@@ -647,6 +769,142 @@ export default function AdminDashboard() {
             >
               {saving ? "Saving…" : "Save All Content"}
             </button>
+          </div>
+        )}
+
+        {/* Hero Background Tab */}
+        {activeTab === "hero" && (
+          <div className="space-y-8">
+            <div className="rounded-2xl bg-primary border border-border p-6 shadow-card">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-heading font-bold text-secondary">Hero Background Images</h2>
+                  <p className="text-sm text-foreground-muted">Upload background images and set rotation degrees. These appear behind the hero headline.</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleAddHeroBackgroundImage} className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Image</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setNewHeroBgFile(e.target.files?.[0] || null)}
+                    className="w-full text-sm text-foreground-muted file:mr-2 file:rounded-lg file:border-0 file:bg-secondary/10 file:px-3 file:py-2 file:text-sm file:font-medium file:text-secondary hover:file:bg-secondary/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Rotation (deg)</label>
+                  <input
+                    type="number"
+                    value={newHeroBgRotation}
+                    onChange={(e) => setNewHeroBgRotation(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-primary px-4 py-2.5 text-foreground focus:border-secondary focus:ring-2 focus:ring-secondary/20 outline-none transition-all"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={uploadingHeroBg || !newHeroBgFile}
+                  className="rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-primary hover:bg-secondary-light transition-colors disabled:opacity-50"
+                >
+                  {uploadingHeroBg ? "Uploading…" : "+ Add Image"}
+                </button>
+              </form>
+            </div>
+
+            <div className="rounded-2xl bg-primary border border-border p-6 shadow-card">
+              <h3 className="text-lg font-heading font-bold text-secondary mb-4">Images ({heroBackgroundImages.length})</h3>
+
+              {heroBgLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin h-6 w-6 border-2 border-secondary border-t-transparent rounded-full" />
+                </div>
+              ) : heroBackgroundImages.length === 0 ? (
+                <p className="text-foreground-muted text-sm">No hero background images yet.</p>
+              ) : (
+                <div className="space-y-4">
+                  {heroBackgroundImages
+                    .slice()
+                    .sort((a, b) => (a.sort_order - b.sort_order) || a.created_at.localeCompare(b.created_at))
+                    .map((img, idx) => (
+                      <div key={img.id} className="flex flex-col md:flex-row md:items-center gap-4 rounded-lg border border-border p-4">
+                        <div className="relative w-full md:w-64 h-36 rounded-lg overflow-hidden border border-border bg-background-off">
+                          <Image
+                            src={img.image_url}
+                            alt="Hero background"
+                            fill
+                            className="object-cover"
+                            style={{ transform: `rotate(${img.rotation_deg}deg)` }}
+                          />
+                        </div>
+
+                        <div className="flex-1 space-y-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-sm font-medium text-foreground mb-1.5">Rotation (deg)</label>
+                              <input
+                                type="number"
+                                defaultValue={img.rotation_deg}
+                                onBlur={(e) => handleUpdateHeroBackgroundImage(img.id, { rotation_deg: Number(e.target.value) })}
+                                className="w-full rounded-lg border border-border bg-primary px-4 py-2.5 text-foreground focus:border-secondary focus:ring-2 focus:ring-secondary/20 outline-none transition-all"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-foreground mb-1.5">Order</label>
+                              <input
+                                type="number"
+                                defaultValue={img.sort_order}
+                                onBlur={(e) => handleUpdateHeroBackgroundImage(img.id, { sort_order: Number(e.target.value) })}
+                                className="w-full rounded-lg border border-border bg-primary px-4 py-2.5 text-foreground focus:border-secondary focus:ring-2 focus:ring-secondary/20 outline-none transition-all"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={() => {
+                                const sorted = heroBackgroundImages.slice().sort((a, b) => (a.sort_order - b.sort_order) || a.created_at.localeCompare(b.created_at));
+                                const current = sorted[idx];
+                                const prev = sorted[idx - 1];
+                                void handleUpdateHeroBackgroundImage(current.id, { sort_order: prev.sort_order });
+                                void handleUpdateHeroBackgroundImage(prev.id, { sort_order: current.sort_order });
+                              }}
+                              className="rounded-lg bg-background-off px-3 py-1.5 text-xs font-medium text-foreground-muted hover:text-secondary disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              Move Up
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === heroBackgroundImages.length - 1}
+                              onClick={() => {
+                                const sorted = heroBackgroundImages.slice().sort((a, b) => (a.sort_order - b.sort_order) || a.created_at.localeCompare(b.created_at));
+                                const current = sorted[idx];
+                                const next = sorted[idx + 1];
+                                void handleUpdateHeroBackgroundImage(current.id, { sort_order: next.sort_order });
+                                void handleUpdateHeroBackgroundImage(next.id, { sort_order: current.sort_order });
+                              }}
+                              className="rounded-lg bg-background-off px-3 py-1.5 text-xs font-medium text-foreground-muted hover:text-secondary disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              Move Down
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteHeroBackgroundImage(img.id)}
+                              className="rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1031,6 +1289,69 @@ export default function AdminDashboard() {
                 {uploadingLogo ? "Uploading…" : "Upload Logo"}
               </button>
             </form>
+          </div>
+        )}
+
+        {/* Theme Tab */}
+        {activeTab === "theme" && (
+          <div className="space-y-8">
+            <div className="rounded-2xl bg-primary border border-border p-6 shadow-card">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-heading font-bold text-secondary">Theme Colors</h2>
+                  <p className="text-sm text-foreground-muted">Change the site colors. Click “Save All Content” to apply.</p>
+                </div>
+              </div>
+
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                {([
+                  { key: "theme_color_primary" as SiteContentKey, label: "Primary" },
+                  { key: "theme_color_secondary" as SiteContentKey, label: "Secondary" },
+                  { key: "theme_color_secondary_light" as SiteContentKey, label: "Secondary Light" },
+                  { key: "theme_color_secondary_dark" as SiteContentKey, label: "Secondary Dark" },
+                  { key: "theme_color_accent" as SiteContentKey, label: "Accent" },
+                  { key: "theme_color_accent_light" as SiteContentKey, label: "Accent Light" },
+                  { key: "theme_color_accent_dark" as SiteContentKey, label: "Accent Dark" },
+                  { key: "theme_color_background" as SiteContentKey, label: "Background" },
+                  { key: "theme_color_background_off" as SiteContentKey, label: "Background Off" },
+                  { key: "theme_color_foreground" as SiteContentKey, label: "Foreground" },
+                  { key: "theme_color_foreground_muted" as SiteContentKey, label: "Foreground Muted" },
+                  { key: "theme_color_border" as SiteContentKey, label: "Border" },
+                ] as const).map((item) => {
+                  const current = content[item.key] || "";
+                  const safeColor = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(current) ? current : "#000000";
+
+                  return (
+                    <div key={item.key} className="rounded-xl border border-border p-4">
+                      <label className="block text-sm font-medium text-foreground mb-2">{item.label}</label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={safeColor}
+                          onChange={(e) => handleContentChange(item.key, e.target.value)}
+                          className="h-10 w-12 rounded-md border border-border bg-primary"
+                        />
+                        <input
+                          type="text"
+                          value={current}
+                          onChange={(e) => handleContentChange(item.key, e.target.value)}
+                          placeholder="#000000"
+                          className="flex-1 rounded-lg border border-border bg-primary px-4 py-2.5 text-foreground focus:border-secondary focus:ring-2 focus:ring-secondary/20 outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={handleSaveContent}
+                disabled={saving}
+                className="mt-8 w-full rounded-lg bg-secondary px-6 py-3 text-sm font-semibold text-primary hover:bg-secondary-light disabled:opacity-50 transition-colors"
+              >
+                {saving ? "Saving…" : "Save Theme Colors"}
+              </button>
+            </div>
           </div>
         )}
 

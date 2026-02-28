@@ -33,6 +33,18 @@ async function getLayoutContent(): Promise<ContentMap> {
         "contact_email",
         "location_address",
         "logo_url",
+        "theme_color_primary",
+        "theme_color_secondary",
+        "theme_color_secondary_light",
+        "theme_color_secondary_dark",
+        "theme_color_accent",
+        "theme_color_accent_light",
+        "theme_color_accent_dark",
+        "theme_color_background",
+        "theme_color_background_off",
+        "theme_color_foreground",
+        "theme_color_foreground_muted",
+        "theme_color_border",
       ]);
 
     if (error || !data) return {};
@@ -111,8 +123,23 @@ export default async function RootLayout({
 }) {
   const content = await getLayoutContent();
 
+  const themeStyle: React.CSSProperties = {
+    ...(content.theme_color_primary ? { ["--color-primary" as any]: content.theme_color_primary } : null),
+    ...(content.theme_color_secondary ? { ["--color-secondary" as any]: content.theme_color_secondary } : null),
+    ...(content.theme_color_secondary_light ? { ["--color-secondary-light" as any]: content.theme_color_secondary_light } : null),
+    ...(content.theme_color_secondary_dark ? { ["--color-secondary-dark" as any]: content.theme_color_secondary_dark } : null),
+    ...(content.theme_color_accent ? { ["--color-accent" as any]: content.theme_color_accent } : null),
+    ...(content.theme_color_accent_light ? { ["--color-accent-light" as any]: content.theme_color_accent_light } : null),
+    ...(content.theme_color_accent_dark ? { ["--color-accent-dark" as any]: content.theme_color_accent_dark } : null),
+    ...(content.theme_color_background ? { ["--color-background" as any]: content.theme_color_background } : null),
+    ...(content.theme_color_background_off ? { ["--color-background-off" as any]: content.theme_color_background_off } : null),
+    ...(content.theme_color_foreground ? { ["--color-foreground" as any]: content.theme_color_foreground } : null),
+    ...(content.theme_color_foreground_muted ? { ["--color-foreground-muted" as any]: content.theme_color_foreground_muted } : null),
+    ...(content.theme_color_border ? { ["--color-border" as any]: content.theme_color_border } : null),
+  };
+
   return (
-    <html lang="en" className={`${sora.variable} ${dmSans.variable}`}>
+    <html lang="en" className={`${sora.variable} ${dmSans.variable}`} style={themeStyle}>
       <body className="min-h-screen flex flex-col">
         <Navbar
           companyName={content.company_name || "PT Swadaya Teknik Mandiri"}

@@ -35,6 +35,22 @@ async function getHomeContent(): Promise<ContentMap> {
     (data as Pick<SiteContent, "key" | "value">[]).forEach((item) => {
       contentMap[item.key as keyof ContentMap] = item.value ?? undefined;
     });
+
+    // Hero background images (public read). If table doesn't exist yet, ignore.
+    try {
+      const { data: heroBgData, error: heroBgError } = await supabase
+        .from("hero_background_images")
+        .select("id, image_url, rotation_deg, sort_order, created_at")
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      if (!heroBgError && heroBgData && heroBgData.length > 0) {
+        contentMap.hero_background_images_json = JSON.stringify(heroBgData);
+      }
+    } catch {
+      // ignore
+    }
+
     return contentMap;
   } catch {
     return {};

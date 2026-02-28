@@ -16,10 +16,31 @@ export interface ContactInfoEntry {
     created_at: string;
 }
 
+export interface HeroBackgroundImage {
+    id: string;
+    image_url: string;
+    rotation_deg: number;
+    sort_order: number;
+    created_at: string;
+}
+
 /** All known site_content keys for type-safe queries */
 export type SiteContentKey =
     | "hero_headline"
     | "hero_subheadline"
+    | "hero_background_images_json"
+    | "theme_color_primary"
+    | "theme_color_secondary"
+    | "theme_color_secondary_light"
+    | "theme_color_secondary_dark"
+    | "theme_color_accent"
+    | "theme_color_accent_light"
+    | "theme_color_accent_dark"
+    | "theme_color_background"
+    | "theme_color_background_off"
+    | "theme_color_foreground"
+    | "theme_color_foreground_muted"
+    | "theme_color_border"
     | "company_name"
     | "info_box_1_title"
     | "info_box_1_body"
