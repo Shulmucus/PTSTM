@@ -7,6 +7,13 @@ export default async function proxy(request: NextRequest) {
         request,
     });
 
+    const isAdminPath = request.nextUrl.pathname.startsWith("/admin");
+    if (isAdminPath) {
+        supabaseResponse.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        supabaseResponse.headers.set("Pragma", "no-cache");
+        supabaseResponse.headers.set("Expires", "0");
+    }
+
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -49,22 +56,46 @@ export default async function proxy(request: NextRequest) {
         // If user is logged in but not an admin, redirect to login
         if (!isActuallyAdmin) {
             if (isDashboardPath) {
-                return NextResponse.redirect(new URL("/admin", request.url));
+                const res = NextResponse.redirect(new URL("/admin", request.url));
+                if (isAdminPath) {
+                    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+                    res.headers.set("Pragma", "no-cache");
+                    res.headers.set("Expires", "0");
+                }
+                return res;
             }
             // If they're on login page, let them stay there to see the login form
             return supabaseResponse;
         }
 
         // User is an admin
+        // If an admin navigates outside /admin, force sign-out so returning requires re-login.
+        if (!isAdminPath) {
+            await supabase.auth.signOut();
+            return supabaseResponse;
+        }
+
         if (isLoginPage) {
             // Logged in as admin and hit login page -> To dashboard
-            return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+            const res = NextResponse.redirect(new URL("/admin/dashboard", request.url));
+            if (isAdminPath) {
+                res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+                res.headers.set("Pragma", "no-cache");
+                res.headers.set("Expires", "0");
+            }
+            return res;
         }
     } else {
         // No user exists
         if (isDashboardPath) {
             // Trying to access dashboard without login -> redirect to login
-            return NextResponse.redirect(new URL("/admin", request.url));
+            const res = NextResponse.redirect(new URL("/admin", request.url));
+            if (isAdminPath) {
+                res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+                res.headers.set("Pragma", "no-cache");
+                res.headers.set("Expires", "0");
+            }
+            return res;
         }
     }
 
