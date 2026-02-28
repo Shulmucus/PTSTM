@@ -6,7 +6,7 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase";
 import AdminPasswordReset from "@/components/admin/AdminPasswordReset";
 import AdminUserManagement from "@/components/admin/AdminUserManagement";
-import type { ContentMap, GalleryItem, SiteContentKey, ServiceCardPayload } from "@/types";
+import type { ContentMap, ContactInfoEntry, GalleryItem, SiteContentKey, ServiceCardPayload } from "@/types";
 
 /* ─── Content field definitions for the admin editor ─── */
 const CONTENT_SECTIONS = [
@@ -38,14 +38,6 @@ const CONTENT_SECTIONS = [
     ],
   },
   // The old Cards 1-6 are removed. They are replaced by the dynamic tab.
-  {
-    label: "Contact Info",
-    fields: [
-      { key: "contact_phone" as SiteContentKey, label: "Phone", type: "text" as const },
-      { key: "contact_email" as SiteContentKey, label: "Email", type: "text" as const },
-      { key: "location_address" as SiteContentKey, label: "Location Address", type: "text" as const },
-    ],
-  },
 ] as const;
 
 export default function AdminDashboard() {
@@ -60,7 +52,13 @@ export default function AdminDashboard() {
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"content" | "services" | "gallery" | "logo" | "settings">("content");
+  const [activeTab, setActiveTab] = useState<"content" | "contact" | "services" | "gallery" | "logo" | "settings">("content");
+
+  const [contactInfo, setContactInfo] = useState<ContactInfoEntry[]>([]);
+  const [contactLoading, setContactLoading] = useState(false);
+  const [newContactType, setNewContactType] = useState<ContactInfoEntry["type"]>("phone");
+  const [newContactValue, setNewContactValue] = useState("");
+  const [newContactLabel, setNewContactLabel] = useState("");
 
   // Dynamic Service Cards State
   const [services, setServices] = useState<ServiceCardPayload[]>([]);
@@ -96,6 +94,23 @@ export default function AdminDashboard() {
     
     checkUser();
   }, [supabase]);
+
+  const fetchContactInfo = useCallback(async () => {
+    setContactLoading(true);
+    try {
+      const res = await fetch("/api/admin/contact-info");
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        setContactInfo([]);
+        return;
+      }
+      setContactInfo((json.data ?? []) as ContactInfoEntry[]);
+    } catch {
+      setContactInfo([]);
+    } finally {
+      setContactLoading(false);
+    }
+  }, []);
 
   const fetchContent = useCallback(async () => {
     // Only fetch from DB if we haven't initialized yet
@@ -184,8 +199,70 @@ export default function AdminDashboard() {
     if (!loading && user) {
       fetchContent();
       fetchGallery();
+      fetchContactInfo();
     }
-  }, [user, loading, fetchContent, fetchGallery]);
+  }, [user, loading, fetchContent, fetchGallery, fetchContactInfo]);
+
+  const handleAddContactInfo = async () => {
+    if (!newContactValue.trim()) return;
+
+    setContactLoading(true);
+    try {
+      const res = await fetch("/api/admin/contact-info", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: newContactType,
+          value: newContactValue.trim(),
+          label: newContactLabel.trim() || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        setSaveMessage(json.error || "Failed to add contact info");
+        setTimeout(() => setSaveMessage(null), 3000);
+        return;
+      }
+
+      setNewContactValue("");
+      setNewContactLabel("");
+      await fetchContactInfo();
+      setSaveMessage("Contact info added!");
+      setTimeout(() => setSaveMessage(null), 3000);
+    } catch {
+      setSaveMessage("Failed to add contact info");
+      setTimeout(() => setSaveMessage(null), 3000);
+    } finally {
+      setContactLoading(false);
+    }
+  };
+
+  const handleDeleteContactInfo = async (id: string) => {
+    if (!confirm("Delete this contact info?")) return;
+
+    setContactLoading(true);
+    try {
+      const res = await fetch("/api/admin/contact-info", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        setSaveMessage(json.error || "Failed to delete contact info");
+        setTimeout(() => setSaveMessage(null), 3000);
+        return;
+      }
+      await fetchContactInfo();
+      setSaveMessage("Contact info deleted.");
+      setTimeout(() => setSaveMessage(null), 3000);
+    } catch {
+      setSaveMessage("Failed to delete contact info");
+      setTimeout(() => setSaveMessage(null), 3000);
+    } finally {
+      setContactLoading(false);
+    }
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -467,7 +544,7 @@ export default function AdminDashboard() {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Tab Navigation */}
         <div className="flex gap-2 mb-8 border-b border-border">
-          {(["content", "services", "gallery", "logo", "settings"] as const).map((tab) => (
+          {(["content", "contact", "services", "gallery", "logo", "settings"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -476,7 +553,17 @@ export default function AdminDashboard() {
                 : "text-foreground-muted hover:text-secondary"
                 }`}
             >
-              {tab === "content" ? "Site Content" : tab === "services" ? "Services" : tab === "gallery" ? "Gallery" : tab === "logo" ? "Logo" : "Settings"}
+              {tab === "content"
+                ? "Site Content"
+                : tab === "contact"
+                  ? "Contact Info"
+                  : tab === "services"
+                    ? "Services"
+                    : tab === "gallery"
+                      ? "Gallery"
+                      : tab === "logo"
+                        ? "Logo"
+                        : "Settings"}
             </button>
           ))}
         </div>
@@ -560,6 +647,93 @@ export default function AdminDashboard() {
             >
               {saving ? "Saving…" : "Save All Content"}
             </button>
+          </div>
+        )}
+
+        {/* Contact Tab */}
+        {activeTab === "contact" && (
+          <div className="space-y-8">
+            <div className="rounded-2xl bg-primary border border-border p-6 shadow-card">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-heading font-bold text-secondary">Contact Info</h2>
+                  <p className="text-sm text-foreground-muted">Add and manage phone numbers, emails, and locations.</p>
+                </div>
+              </div>
+
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-3">
+                <select
+                  value={newContactType}
+                  onChange={(e) => setNewContactType(e.target.value as ContactInfoEntry["type"])}
+                  className="w-full rounded-lg border border-border bg-primary px-4 py-2.5 text-foreground focus:border-secondary focus:ring-2 focus:ring-secondary/20 outline-none transition-all"
+                >
+                  <option value="phone">Phone</option>
+                  <option value="email">Email</option>
+                  <option value="location">Location</option>
+                </select>
+                <input
+                  type="text"
+                  value={newContactValue}
+                  onChange={(e) => setNewContactValue(e.target.value)}
+                  className="w-full md:col-span-2 rounded-lg border border-border bg-primary px-4 py-2.5 text-foreground focus:border-secondary focus:ring-2 focus:ring-secondary/20 outline-none transition-all"
+                  placeholder={newContactType === "phone" ? "+62 21 ..." : newContactType === "email" ? "info@..." : "Jl. ..."}
+                />
+                <input
+                  type="text"
+                  value={newContactLabel}
+                  onChange={(e) => setNewContactLabel(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-primary px-4 py-2.5 text-foreground focus:border-secondary focus:ring-2 focus:ring-secondary/20 outline-none transition-all"
+                  placeholder="Label (optional)"
+                />
+              </div>
+
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={handleAddContactInfo}
+                  disabled={contactLoading || !newContactValue.trim()}
+                  className="rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-primary hover:bg-secondary-light transition-colors disabled:opacity-50"
+                >
+                  + Contact info
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-primary border border-border p-6 shadow-card">
+              <h3 className="text-lg font-heading font-bold text-secondary mb-4">Entries ({contactInfo.length})</h3>
+
+              {contactLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin h-6 w-6 border-2 border-secondary border-t-transparent rounded-full" />
+                </div>
+              ) : contactInfo.length === 0 ? (
+                <p className="text-foreground-muted text-sm">No contact info yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {contactInfo.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="flex items-start justify-between gap-4 rounded-lg border border-border p-4 hover:bg-background-off transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-foreground">
+                          <span className="capitalize">{entry.type}</span>
+                          {entry.label ? <span className="text-foreground-muted"> · {entry.label}</span> : null}
+                        </div>
+                        <div className="text-sm text-foreground-muted break-words">{entry.value}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteContactInfo(entry.id)}
+                        className="rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

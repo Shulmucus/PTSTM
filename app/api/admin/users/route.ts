@@ -1,7 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 import { createServiceRoleClient } from "@/lib/supabase-server";
 
+async function requireAdmin(request: NextRequest) {
+  const supabaseResponse = NextResponse.next({ request });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options));
+        },
+      },
+    }
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user?.email) return { ok: false as const, email: null };
+
+  const serviceSupabase = createServiceRoleClient();
+  const { data: adminData } = await serviceSupabase
+    .from("admin_users")
+    .select("id")
+    .eq("email", user.email)
+    .single();
+
+  return { ok: !!adminData, email: user.email };
+}
+
 export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request);
+  if (!auth.ok) {
+    return NextResponse.json({ data: null, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const serviceSupabase = createServiceRoleClient();
     const { data, error } = await serviceSupabase
@@ -22,6 +63,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { username, password } = await request.json();
 
@@ -108,6 +154,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const auth = await requireAdmin(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { adminId, adminEmail } = await request.json();
 

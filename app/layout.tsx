@@ -41,6 +41,25 @@ async function getLayoutContent(): Promise<ContentMap> {
     (data as Pick<SiteContent, "key" | "value">[]).forEach((item) => {
       contentMap[item.key as keyof ContentMap] = item.value ?? undefined;
     });
+
+    // Multi-entry contact info (public read). If table doesn't exist yet, ignore.
+    try {
+      const { data: contactData, error: contactError } = await supabase
+        .from("contact_info_entries")
+        .select("type, value, label, sort_order, created_at")
+        .order("type", { ascending: true })
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      if (!contactError && contactData && contactData.length > 0) {
+        contentMap.contact_info_entries_json = JSON.stringify(
+          contactData.map((e) => ({ type: e.type, value: e.value, label: e.label ?? null }))
+        );
+      }
+    } catch {
+      // ignore
+    }
+
     return contentMap;
   } catch {
     // Supabase not configured yet — return defaults

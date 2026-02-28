@@ -6,6 +6,16 @@ export interface SiteContent {
     updated_at: string;
 }
 
+/* ─── Contact Info Entry ─── */
+export interface ContactInfoEntry {
+    id: string;
+    type: "phone" | "email" | "location";
+    value: string;
+    label: string | null;
+    sort_order: number;
+    created_at: string;
+}
+
 /** All known site_content keys for type-safe queries */
 export type SiteContentKey =
     | "hero_headline"
@@ -36,6 +46,7 @@ export type SiteContentKey =
     | "contact_phone"
     | "contact_email"
     | "location_address"
+    | "contact_info_entries_json"
     | "logo_url"
     | "services_cards";
 
