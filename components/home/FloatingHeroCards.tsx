@@ -28,7 +28,7 @@ export default function FloatingHeroCards({ content }: FloatingHeroCardsProps) {
 
   return (
     <div className="absolute inset-0 overflow-hidden z-0 pointer-events-none">
-      <div className="absolute inset-0 opacity-40">
+      <div className="absolute inset-0 opacity-50">
         {slides.map((img, idx) => {
           const lane = idx % 4;
           const lanes = [

@@ -90,8 +90,8 @@ export default async function HomePage() {
             className="object-cover"
             priority
           />
-          {/* Dimmer & Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-b from-secondary/40 via-secondary/70 to-secondary/95" />
+          {/* Frosted Glass & Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-b from-secondary/40 via-secondary/70 to-secondary/95 backdrop-blur-sm" />
         </div>
 
         <FloatingHeroCards content={content} />
