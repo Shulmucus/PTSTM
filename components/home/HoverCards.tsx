@@ -73,7 +73,7 @@ function HoverCard({ card, index }: { card: CardData; index: number }) {
 
     return (
         <div
-            className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border-2 border-border hover:border-accent transition-colors duration-300 shadow-card hover:shadow-card-hover w-[calc(50%-0.5rem)] sm:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)] flex-shrink-0 flex-grow-0"
+            className="group relative h-72 lg:h-80 rounded-2xl overflow-hidden cursor-pointer border-2 border-border hover:border-accent transition-colors duration-300 shadow-card hover:shadow-card-hover w-[calc(50%-0.5rem)] sm:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)] flex-shrink-0 flex-grow-0"
             onClick={() => setRevealed(!revealed)}
             onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
@@ -112,7 +112,7 @@ function HoverCard({ card, index }: { card: CardData; index: number }) {
 
             {/* Revealed state — description on image */}
             <div
-                className={`absolute inset-0 flex flex-col items-center justify-center p-6 text-primary transition-opacity duration-500 ${revealed
+                className={`absolute inset-0 flex flex-col items-center justify-center px-4 py-6 sm:px-6 text-primary transition-opacity duration-500 overflow-y-auto ${revealed
                     ? "opacity-100"
                     : "opacity-0 md:group-hover:opacity-100"
                     }`}
