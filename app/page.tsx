@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import type { ContentMap, SiteContent } from "@/types";
 import HeroSection from "@/components/home/HeroSection";
@@ -52,6 +53,22 @@ async function getHomeContent(): Promise<ContentMap> {
       // ignore
     }
 
+    // Hero Base Background (single)
+    try {
+      const { data: baseBgData, error: baseBgError } = await supabase
+        .from("hero_base_background")
+        .select("image_url")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!baseBgError && baseBgData) {
+        contentMap.hero_background_url = baseBgData.image_url;
+      }
+    } catch {
+      // ignore
+    }
+
     return contentMap;
   } catch {
     return {};
@@ -63,7 +80,20 @@ export default async function HomePage() {
 
   return (
     <>
-      <section className="relative w-full bg-secondary overflow-hidden">
+      <section className="relative w-full min-h-[600px] overflow-hidden">
+        {/* Background Image */}
+        <div className="absolute inset-0 z-0">
+          <Image
+            src={content.hero_background_url || "/images/hero-bg.png"}
+            alt="Industrial Background"
+            fill
+            className="object-cover"
+            priority
+          />
+          {/* Dimmer & Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-b from-secondary/40 via-secondary/70 to-secondary/95" />
+        </div>
+
         <FloatingHeroCards content={content} />
         <div className="relative z-10">
           <HeroSection content={content} />

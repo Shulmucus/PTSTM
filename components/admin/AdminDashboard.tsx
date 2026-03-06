@@ -21,6 +21,7 @@ const CONTENT_SECTIONS = [
     fields: [
       { key: "hero_headline" as SiteContentKey, label: "Headline", type: "text" as const },
       { key: "hero_subheadline" as SiteContentKey, label: "Subheadline", type: "textarea" as const },
+      { key: "hero_background_url" as SiteContentKey, label: "Background Image URL", type: "text" as const },
     ],
   },
   {
@@ -97,7 +98,7 @@ export default function AdminDashboard() {
         setLoading(false);
       }
     };
-    
+
     checkUser();
   }, [supabase]);
 
@@ -499,7 +500,8 @@ export default function AdminDashboard() {
     setUploadingCardImage(cardKey);
     try {
       const fileExt = file.name.split(".").pop();
-      const fileName = `cards/${cardKey}.${fileExt}`;
+      const folder = cardKey === "hero_background_url" ? "hero-base" : "cards";
+      const fileName = `${folder}/${cardKey}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("assets")
@@ -517,6 +519,12 @@ export default function AdminDashboard() {
           { key: cardKey, value: urlData.publicUrl, updated_at: new Date().toISOString() },
           { onConflict: "key" }
         );
+
+      if (cardKey === "hero_background_url") {
+        await supabase
+          .from("hero_base_background")
+          .insert({ image_url: urlData.publicUrl });
+      }
 
       setContent((prev) => ({ ...prev, [cardKey]: urlData.publicUrl }));
       setCardImageFiles((prev) => ({ ...prev, [cardKey]: null }));
@@ -675,17 +683,17 @@ export default function AdminDashboard() {
                 ? "Site Content"
                 : tab === "hero"
                   ? "Hero Background"
-                : tab === "contact"
-                  ? "Contact Info"
-                : tab === "services"
-                    ? "Services"
-                    : tab === "gallery"
-                      ? "Gallery"
-                      : tab === "logo"
-                        ? "Logo"
-                        : tab === "theme"
-                          ? "Theme"
-                        : "Settings"}
+                  : tab === "contact"
+                    ? "Contact Info"
+                    : tab === "services"
+                      ? "Services"
+                      : tab === "gallery"
+                        ? "Gallery"
+                        : tab === "logo"
+                          ? "Logo"
+                          : tab === "theme"
+                            ? "Theme"
+                            : "Settings"}
             </button>
           ))}
         </div>
@@ -732,7 +740,7 @@ export default function AdminDashboard() {
                             className="flex-1 rounded-lg border border-border bg-primary px-4 py-2.5 text-foreground focus:border-secondary focus:ring-2 focus:ring-secondary/20 outline-none transition-all"
                           />
                           {/* Card image upload button */}
-                          {field.key.endsWith("_image_url") && (
+                          {(field.key.endsWith("_image_url") || field.key === "hero_background_url") && (
                             <div className="flex items-center gap-2">
                               <input
                                 type="file"
@@ -1362,7 +1370,7 @@ export default function AdminDashboard() {
               <h2 className="text-xl font-heading font-bold text-secondary mb-2">Admin Settings</h2>
               <p className="text-sm text-foreground-muted">Manage your admin account and create new admin users.</p>
             </div>
-            
+
             <AdminPasswordReset />
             <AdminUserManagement />
           </div>

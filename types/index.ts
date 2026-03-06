@@ -28,6 +28,7 @@ export interface HeroBackgroundImage {
 export type SiteContentKey =
     | "hero_headline"
     | "hero_subheadline"
+    | "hero_background_url"
     | "hero_background_images_json"
     | "theme_color_primary"
     | "theme_color_secondary"
