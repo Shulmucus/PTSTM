@@ -58,8 +58,9 @@ export default function AdminDashboard() {
   const [contactInfo, setContactInfo] = useState<ContactInfoEntry[]>([]);
   const [contactLoading, setContactLoading] = useState(false);
   const [newContactType, setNewContactType] = useState<ContactInfoEntry["type"]>("phone");
-  const [newContactValue, setNewContactValue] = useState("");
   const [newContactLabel, setNewContactLabel] = useState("");
+  const [newContactValue, setNewContactValue] = useState("");
+  const [newContactPhoneCode, setNewContactPhoneCode] = useState("+62");
 
   const [heroBackgroundImages, setHeroBackgroundImages] = useState<HeroBackgroundImage[]>([]);
   const [heroBgLoading, setHeroBgLoading] = useState(false);
@@ -332,7 +333,7 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: newContactType,
-          value: newContactValue.trim(),
+          value: newContactType === "phone" ? `${newContactPhoneCode} ${newContactValue.trim()}` : newContactValue.trim(),
           label: newContactLabel.trim() || null,
         }),
       });
@@ -937,13 +938,37 @@ export default function AdminDashboard() {
                   <option value="email">Email</option>
                   <option value="location">Location</option>
                 </select>
-                <input
-                  type="text"
-                  value={newContactValue}
-                  onChange={(e) => setNewContactValue(e.target.value)}
-                  className="w-full md:col-span-2 rounded-lg border border-border bg-primary px-4 py-2.5 text-foreground focus:border-secondary focus:ring-2 focus:ring-secondary/20 outline-none transition-all"
-                  placeholder={newContactType === "phone" ? "+62 21 ..." : newContactType === "email" ? "info@..." : "Jl. ..."}
-                />
+                {newContactType === "phone" ? (
+                  <div className="w-full md:col-span-2 flex gap-2">
+                    <select
+                      value={newContactPhoneCode}
+                      onChange={(e) => setNewContactPhoneCode(e.target.value)}
+                      className="w-[110px] shrink-0 rounded-lg border border-border bg-primary px-2 py-2.5 text-foreground focus:border-secondary focus:ring-2 focus:ring-secondary/20 outline-none transition-all"
+                    >
+                      <option value="+62">+62 (ID)</option>
+                      <option value="+1">+1 (US)</option>
+                      <option value="+44">+44 (UK)</option>
+                      <option value="+61">+61 (AU)</option>
+                      <option value="+65">+65 (SG)</option>
+                      <option value="+60">+60 (MY)</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={newContactValue}
+                      onChange={(e) => setNewContactValue(e.target.value)}
+                      className="w-full rounded-lg border border-border bg-primary px-4 py-2.5 text-foreground focus:border-secondary focus:ring-2 focus:ring-secondary/20 outline-none transition-all"
+                      placeholder="812-..."
+                    />
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={newContactValue}
+                    onChange={(e) => setNewContactValue(e.target.value)}
+                    className="w-full md:col-span-2 rounded-lg border border-border bg-primary px-4 py-2.5 text-foreground focus:border-secondary focus:ring-2 focus:ring-secondary/20 outline-none transition-all"
+                    placeholder={newContactType === "email" ? "info@..." : "Jl. ..."}
+                  />
+                )}
                 <input
                   type="text"
                   value={newContactLabel}
