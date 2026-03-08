@@ -71,7 +71,7 @@ export default function Navbar({
                             priority
                         />
                     </div>
-                    <span className="truncate text-lg font-bold font-heading text-secondary">
+                    <span className="text-base sm:text-lg font-bold font-heading text-secondary whitespace-normal break-words">
                         {companyName}
                     </span>
                 </Link>
