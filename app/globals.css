@@ -42,7 +42,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-heading);
   font-weight: 700;
   line-height: 1.2;
@@ -66,17 +71,20 @@ html {
 
 /* ─── Loading Skeleton Animation ─── */
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--color-border) 25%,
-    var(--color-background-off) 50%,
-    var(--color-border) 75%
-  );
+  background: linear-gradient(90deg,
+      var(--color-border) 25%,
+      var(--color-background-off) 50%,
+      var(--color-border) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
   border-radius: 0.5rem;
@@ -98,4 +106,44 @@ html {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-foreground-muted);
+}
+
+/* ─── Global Watermark Overlay ─── */
+.watermark-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.watermark-content {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  transform: rotate(-25deg);
+  opacity: 0.4;
+  white-space: nowrap;
+}
+
+.watermark-line {
+  display: block;
+  width: 40vw;
+  height: 3px;
+  background-color: #000000;
+  flex-shrink: 0;
+}
+
+.watermark-text {
+  font-family: var(--font-heading);
+  font-size: clamp(3rem, 8vw, 7rem);
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  color: #000000;
+  text-transform: uppercase;
+  user-select: none;
+  flex-shrink: 0;
 }
