@@ -3,7 +3,6 @@ import { Sora, DM_Sans } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import Watermark from "@/components/layout/Watermark";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import type { ContentMap, SiteContent } from "@/types";
 
@@ -148,7 +147,6 @@ export default async function RootLayout({
         />
         <main className="flex-1">{children}</main>
         <Footer content={content} />
-        <Watermark />
       </body>
     </html>
   );
