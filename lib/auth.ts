@@ -61,3 +61,28 @@ export async function isAdmin(email: string): Promise<boolean> {
 
     return true;
 }
+
+/**
+ * Validates the current authenticated session is an admin.
+ * Re-usable backend helper for API routes.
+ */
+export async function requireAdmin() {
+    const supabase = await createServerSupabaseClient();
+    const {
+        data: { user },
+        error
+    } = await supabase.auth.getUser();
+
+    if (error || !user?.email) {
+        return { ok: false as const, email: null };
+    }
+
+    const serviceSupabase = createServiceRoleClient();
+    const { data: adminData } = await serviceSupabase
+        .from("admin_users")
+        .select("id")
+        .eq("email", user.email)
+        .single();
+
+    return { ok: !!adminData, email: user.email };
+}

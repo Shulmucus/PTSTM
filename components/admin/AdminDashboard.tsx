@@ -142,12 +142,45 @@ export default function AdminDashboard() {
     if (contentHasInitialized.current) return;
     contentHasInitialized.current = true;
 
+    const initializeServicesFromMap = (map: ContentMap) => {
+      if (!servicesHasInitialized.current) {
+        let loadedServices = false;
+        if (map.services_cards) {
+          try {
+            const parsed = JSON.parse(map.services_cards) as ServiceCardPayload[];
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setServices(parsed);
+              loadedServices = true;
+            }
+          } catch {
+            // fallback if parse fails
+          }
+        }
+
+        if (!loadedServices) {
+          // If no JSON array exists or it was empty, attempt to pull the legacy 6 cards as the starting point
+          const legacyCards: ServiceCardPayload[] = [];
+          for (let i = 1; i <= 6; i++) {
+            const ti = map[`card_${i}_title` as SiteContentKey] as string;
+            const de = map[`card_${i}_description` as SiteContentKey] as string;
+            const img = map[`card_${i}_image_url` as SiteContentKey] as string;
+            if (ti || de || img) {
+              legacyCards.push({ id: crypto.randomUUID(), title: ti || "", description: de || "", image_url: img || "" });
+            }
+          }
+          setServices(legacyCards);
+        }
+        servicesHasInitialized.current = true;
+      }
+    };
+
     try {
       // 1. Check for draft in localStorage first
       const draftData = localStorage.getItem("admin_content_draft");
       if (draftData) {
         const draft = JSON.parse(draftData) as ContentMap;
         setContent(draft);
+        initializeServicesFromMap(draft);
         setSaveMessage("Loaded unsaved draft from local storage.");
         setTimeout(() => setSaveMessage(null), 3000);
         skipDraftSave.current = false;
@@ -168,28 +201,7 @@ export default function AdminDashboard() {
         map[item.key as keyof ContentMap] = item.value ?? undefined;
       });
       setContent(map);
-
-      if (!servicesHasInitialized.current && map.services_cards) {
-        try {
-          setServices(JSON.parse(map.services_cards) as ServiceCardPayload[]);
-          servicesHasInitialized.current = true;
-        } catch {
-          // fallback to empty if parse fails
-        }
-      } else if (!servicesHasInitialized.current) {
-        // If no JSON array exists, attempt to pull the legacy 6 cards as the starting point
-        const legacyCards: ServiceCardPayload[] = [];
-        for (let i = 1; i <= 6; i++) {
-          const ti = map[`card_${i}_title` as SiteContentKey] as string;
-          const de = map[`card_${i}_description` as SiteContentKey] as string;
-          const img = map[`card_${i}_image_url` as SiteContentKey] as string;
-          if (ti || de || img) {
-            legacyCards.push({ id: crypto.randomUUID(), title: ti || "", description: de || "", image_url: img || "" });
-          }
-        }
-        setServices(legacyCards);
-        servicesHasInitialized.current = true;
-      }
+      initializeServicesFromMap(map);
     }
 
     // Allow saving drafts after initial load finishes
@@ -401,14 +413,15 @@ export default function AdminDashboard() {
       // Inject the current dynamic services into the payload
       const payloadToSave = { ...content, services_cards: JSON.stringify(services) };
 
-      for (const [key, value] of Object.entries(payloadToSave)) {
-        await supabase
-          .from("site_content")
-          .upsert(
-            { key, value, updated_at: new Date().toISOString() },
-            { onConflict: "key" }
-          );
-      }
+      const res = await fetch("/api/admin/site-content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payloadToSave),
+      });
+
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || "Failed to save content");
+
       setSaveMessage("Content saved successfully!");
       // Clear the draft after successful database save
       localStorage.removeItem("admin_content_draft");
@@ -429,24 +442,30 @@ export default function AdminDashboard() {
       const fileExt = logoFile.name.split(".").pop();
       const fileName = `logo.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("assets")
-        .upload(fileName, logoFile, { upsert: true });
+      const formData = new FormData();
+      formData.append("file", logoFile);
+      formData.append("bucket", "assets");
+      formData.append("path", fileName);
 
-      if (uploadError) throw uploadError;
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-      const { data: urlData } = supabase.storage
-        .from("assets")
-        .getPublicUrl(fileName);
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || "Upload failed");
 
-      await supabase
-        .from("site_content")
-        .upsert(
-          { key: "logo_url", value: urlData.publicUrl, updated_at: new Date().toISOString() },
-          { onConflict: "key" }
-        );
+      const publicUrl = json.url;
 
-      setContent((prev) => ({ ...prev, logo_url: urlData.publicUrl }));
+      const saveRes = await fetch("/api/admin/site-content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logo_url: publicUrl }),
+      });
+
+      if (!saveRes.ok) throw new Error("Failed to save logo URL");
+
+      setContent((prev) => ({ ...prev, logo_url: publicUrl }));
       setLogoFile(null);
       setSaveMessage("Logo uploaded successfully!");
     } catch {
@@ -504,30 +523,38 @@ export default function AdminDashboard() {
       const folder = cardKey === "hero_background_url" ? "hero-base" : "cards";
       const fileName = `${folder}/${cardKey}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("assets")
-        .upload(fileName, file, { upsert: true });
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("bucket", "assets");
+      formData.append("path", fileName);
 
-      if (uploadError) throw uploadError;
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-      const { data: urlData } = supabase.storage
-        .from("assets")
-        .getPublicUrl(fileName);
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || "Upload failed");
 
-      await supabase
-        .from("site_content")
-        .upsert(
-          { key: cardKey, value: urlData.publicUrl, updated_at: new Date().toISOString() },
-          { onConflict: "key" }
-        );
+      const publicUrl = json.url;
+
+      const saveRes = await fetch("/api/admin/site-content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [cardKey]: publicUrl }),
+      });
+
+      if (!saveRes.ok) throw new Error("Failed to save image URL");
 
       if (cardKey === "hero_background_url") {
-        await supabase
-          .from("hero_base_background")
-          .insert({ image_url: urlData.publicUrl });
+        await fetch("/api/admin/hero-background-images", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image_url: publicUrl, rotation_deg: 0 }),
+        });
       }
 
-      setContent((prev) => ({ ...prev, [cardKey]: urlData.publicUrl }));
+      setContent((prev) => ({ ...prev, [cardKey]: publicUrl }));
       setCardImageFiles((prev) => ({ ...prev, [cardKey]: null }));
       setSaveMessage("Image uploaded!");
     } catch {
@@ -544,17 +571,22 @@ export default function AdminDashboard() {
       const fileExt = file.name.split(".").pop();
       const fileName = `services/${serviceId}-${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("assets")
-        .upload(fileName, file, { upsert: true });
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("bucket", "assets");
+      formData.append("path", fileName);
 
-      if (uploadError) throw uploadError;
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-      const { data: urlData } = supabase.storage
-        .from("assets")
-        .getPublicUrl(fileName);
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || "Upload failed");
 
-      setServices((prev) => prev.map(s => s.id === serviceId ? { ...s, image_url: urlData.publicUrl } : s));
+      const publicUrl = json.url;
+
+      setServices((prev) => prev.map(s => s.id === serviceId ? { ...s, image_url: publicUrl } : s));
       setSaveMessage("Service image uploaded! (Click Save All Content to finalize)");
     } catch {
       setSaveMessage("Failed to upload service image.");
@@ -573,19 +605,24 @@ export default function AdminDashboard() {
       const fileExt = newGalleryImage.name.split(".").pop();
       const fileName = `gallery/${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("assets")
-        .upload(fileName, newGalleryImage);
+      const formData = new FormData();
+      formData.append("file", newGalleryImage);
+      formData.append("bucket", "assets");
+      formData.append("path", fileName);
 
-      if (uploadError) throw uploadError;
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-      const { data: urlData } = supabase.storage
-        .from("assets")
-        .getPublicUrl(fileName);
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || "Upload failed");
+
+      const publicUrl = json.url;
 
       const { data: newItem, error: insertError } = await supabase
         .from("gallery_items")
-        .insert({ title: newGalleryTitle, image_url: urlData.publicUrl })
+        .insert({ title: newGalleryTitle, image_url: publicUrl })
         .select()
         .single();
 
